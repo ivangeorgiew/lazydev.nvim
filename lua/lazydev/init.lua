@@ -2,7 +2,18 @@ local M = {}
 
 ---@param opts? lazydev.Config
 function M.setup(opts)
-  require("lazydev.config").setup(opts)
+  if vim.bo.filetype == "lua" then
+    require("lazydev.config").setup(opts)
+  else
+    vim.api.nvim_create_autocmd("FileType", {
+      group = vim.api.nvim_create_augroup("lazydev-startup", { clear = true }),
+      pattern = "lua",
+      once = true,
+      callback = function()
+        require("lazydev.config").setup(opts)
+      end,
+    })
+  end
 end
 
 --- Checks if the current buffer is in a workspace:
