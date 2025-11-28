@@ -183,6 +183,10 @@ function M:update()
     end
   end
 
+  ---@type string[]
+  local ignoreDir = vim.tbl_get(settings, "Lua", "workspace", "ignoreDir") or {}
+  vim.list_extend(ignoreDir, Config.lua_root and { "/lua" } or {})
+
   settings = vim.tbl_deep_extend("force", settings, {
     Lua = {
       runtime = {
@@ -193,7 +197,7 @@ function M:update()
       workspace = {
         checkThirdParty = false,
         library = library,
-        ignoreDir = Config.lua_root and { "/lua" } or nil,
+        ignoreDir = ignoreDir,
       },
     },
   })
