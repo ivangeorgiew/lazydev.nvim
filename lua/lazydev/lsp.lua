@@ -1,7 +1,13 @@
 local Workspace = require("lazydev.workspace")
 
+---@class lazydev.Lsp
+---@field client_id number
+---@field updates number
+---@field toggled_semantic_tokens boolean
+---@field toggled_diagnostics table<number,boolean>
+
 local M = {}
-M.attached = {} ---@type table<number,number>
+M.attached = {} ---@type table<number,lazydev.Lsp>
 M.did_global_handler = false
 M.supported_clients = { "lua_ls", "emmylua_ls" }
 
@@ -17,13 +23,18 @@ end
 
 ---@param client vim.lsp.Client
 function M.attach(client)
+  M.assert(client)
+
   if M.attached[client.id] then
     return
   end
 
-  M.assert(client)
-
-  M.attached[client.id] = client.id
+  M.attached[client.id] = {
+    client_id = client.id,
+    updates = 0,
+    toggled_semantic_tokens = false,
+    toggled_diagnostics = {},
+  }
 
   -- lspconfig uses the same empty table for all clients.
   -- We need to make sure that each client has its own handlers table.
@@ -88,11 +99,28 @@ end
 ---@param client vim.lsp.Client
 function M.update(client)
   M.assert(client)
+
+  local lsp = M.attached[client.id]
+
+  -- Temprorarily disable features on attached buffers
+  if vim.lsp.semantic_tokens.is_enabled({ client_id = client.id }) then
+    lsp.toggled_semantic_tokens = true
+    vim.lsp.semantic_tokens.enable(false, { client_id = client.id })
+  end
+
+  for bufnr in pairs(client.attached_buffers) do
+    if vim.api.nvim_buf_is_valid(bufnr) and vim.diagnostic.is_enabled({ bufnr = bufnr }) then
+      lsp.toggled_diagnostics[bufnr] = true
+      vim.diagnostic.enable(false, { bufnr = bufnr })
+    end
+  end
+
   if vim.fn.has("nvim-0.11") == 1 then
     client:notify("workspace/didChangeConfiguration", {
       settings = { Lua = {} },
     })
   else
+    ---@diagnostic disable-next-line: param-type-mismatch
     client.notify("workspace/didChangeConfiguration", {
       settings = { Lua = {} },
     })
